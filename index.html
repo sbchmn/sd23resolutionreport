@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SD23 Committee Resolution Report</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.0/papaparse.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; }
+    .resolution-card { transition: all 0.2s; }
+    .resolution-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="max-w-5xl mx-auto p-8">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-10">
+      <div>
+        <h1 class="text-4xl font-bold text-gray-900">SD23 Committee Resolution Report</h1>
+        <p class="text-gray-600 mt-2">Passed Resolutions • Live from Google Sheet</p>
+      </div>
+      <button onclick="loadData()" 
+              class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2">
+        <span>Refresh Data</span>
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.058 11H1M12 3v2m0 16v2m9-9H15m-6 0a8 8 0 01-7.714-6.18" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Results -->
+    <div id="results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Populated by JavaScript -->
+    </div>
+
+    <!-- Status -->
+    <div id="status" class="mt-8 text-center text-sm text-gray-500"></div>
+  </div>
+
+  <script>
+    // === CHANGE THIS LINE ONLY ===
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTQ4ra96zp-AECe9wjzw2q3nq_PUmo6CUi1kADb4fdb2sOmj_nOnTi0ZZwb8Q0p4PwpNnHc3gFzAZea/pub?output=csv";   // ←←← Your published Google Sheet CSV link
+
+    async function loadData() {
+      const resultsDiv = document.getElementById('results');
+      const statusDiv = document.getElementById('status');
+      
+      resultsDiv.innerHTML = `
+        <div class="col-span-full flex items-center justify-center py-12">
+          <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+          <p class="ml-3 text-gray-600">Loading passed resolutions...</p>
+        </div>`;
+
+      try {
+        const response = await fetch(CSV_URL);
+        const csvText = await response.text();
+
+        Papa.parse(csvText, {
+          header: false,           // we use column index instead of header names
+          skipEmptyLines: true,
+          complete: function(results) {
+            // results.data[0] = header row
+            const rows = results.data.slice(1); // skip header
+
+            const passed = rows.filter(row => {
+              const status = (row[2] || "").trim(); // Column C = index 2
+              return status === "Passed";
+            });
+
+            if (passed.length === 0) {
+              resultsDiv.innerHTML = `
+                <div class="col-span-full bg-white border border-dashed border-gray-300 rounded-3xl p-12 text-center">
+                  <p class="text-xl text-gray-400">No resolutions marked "Passed" yet.</p>
+                </div>`;
+              statusDiv.textContent = `Last checked: ${new Date().toLocaleString()}`;
+              return;
+            }
+
+            // Build beautiful cards
+            let html = '';
+            passed.forEach(row => {
+              const name = (row[1] || "Unnamed Resolution").trim(); // Column B = index 1
+              const link = (row[6] || "#").trim();                 // Column G = index 6
+
+              html += `
+                <a href="${link}" target="_blank" 
+                   class="resolution-card block bg-white border border-gray-200 rounded-3xl p-6 hover:border-blue-300 group">
+                  <div class="flex justify-between items-start">
+                    <h3 class="text-xl font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">${name}</h3>
+                    <span class="text-green-500 text-sm font-medium bg-green-100 px-3 py-1 rounded-2xl">PASSED</span>
+                  </div>
+                  <p class="mt-4 text-blue-600 text-sm flex items-center gap-1">
+                    View Resolution 
+                    <span class="text-lg leading-none">→</span>
+                  </p>
+                </a>`;
+            });
+
+            resultsDiv.innerHTML = html;
+            statusDiv.innerHTML = `
+              <span class="font-medium text-green-600">${passed.length}</span> resolutions passed • 
+              Last updated: ${new Date().toLocaleString()}
+            `;
+          }
+        });
+      } catch (err) {
+        resultsDiv.innerHTML = `
+          <div class="col-span-full bg-red-50 border border-red-200 text-red-700 rounded-3xl p-8 text-center">
+            Could not load sheet. Make sure the CSV link is correct and the sheet is published.<br>
+            <small class="block mt-2 text-red-500">${err.message}</small>
+          </div>`;
+      }
+    }
+
+    // Auto-load on page open
+    window.onload = loadData;
+  </script>
+</body>
+</html>
