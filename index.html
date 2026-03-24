@@ -13,12 +13,12 @@
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
-  <div class="max-w-5xl mx-auto p-8">
+  <div class="max-w-6xl mx-auto p-8">
     <!-- Header -->
     <div class="flex justify-between items-center mb-10">
       <div>
         <h1 class="text-4xl font-bold text-gray-900">SD23 Committee Resolution Report</h1>
-        <p class="text-gray-600 mt-2">Passed Resolutions • Live from Google Sheet</p>
+        <p class="text-gray-600 mt-2">Passed Resolutions • Grouped by Platform Section • Live from Google Sheet</p>
       </div>
       <button onclick="loadData()" 
               class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2">
@@ -30,8 +30,8 @@
     </div>
 
     <!-- Results -->
-    <div id="results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <!-- Populated by JavaScript -->
+    <div id="results" class="space-y-12">
+      <!-- Populated by JavaScript with grouped sections -->
     </div>
 
     <!-- Status -->
@@ -40,16 +40,16 @@
 
   <script>
     // === CHANGE THIS LINE ONLY ===
-    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTQ4ra96zp-AECe9wjzw2q3nq_PUmo6CUi1kADb4fdb2sOmj_nOnTi0ZZwb8Q0p4PwpNnHc3gFzAZea/pub?output=csv";   // ←←← Your published Google Sheet CSV link
+    const CSV_URL = "PASTE_YOUR_CSV_URL_HERE";   // ←←← Your published Google Sheet CSV link
 
     async function loadData() {
       const resultsDiv = document.getElementById('results');
       const statusDiv = document.getElementById('status');
       
       resultsDiv.innerHTML = `
-        <div class="col-span-full flex items-center justify-center py-12">
+        <div class="flex items-center justify-center py-12">
           <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
-          <p class="ml-3 text-gray-600">Loading passed resolutions...</p>
+          <p class="ml-3 text-gray-600">Loading passed resolutions and grouping by Platform Section...</p>
         </div>`;
 
       try {
@@ -57,10 +57,9 @@
         const csvText = await response.text();
 
         Papa.parse(csvText, {
-          header: false,           // we use column index instead of header names
+          header: false,
           skipEmptyLines: true,
           complete: function(results) {
-            // results.data[0] = header row
             const rows = results.data.slice(1); // skip header
 
             const passed = rows.filter(row => {
@@ -70,43 +69,75 @@
 
             if (passed.length === 0) {
               resultsDiv.innerHTML = `
-                <div class="col-span-full bg-white border border-dashed border-gray-300 rounded-3xl p-12 text-center">
+                <div class="bg-white border border-dashed border-gray-300 rounded-3xl p-12 text-center">
                   <p class="text-xl text-gray-400">No resolutions marked "Passed" yet.</p>
                 </div>`;
               statusDiv.textContent = `Last checked: ${new Date().toLocaleString()}`;
               return;
             }
 
-            // Build beautiful cards
-            let html = '';
+            // === GROUP BY COLUMN D (Platform Section) ===
+            const grouped = {};
             passed.forEach(row => {
-              const name = (row[1] || "Unnamed Resolution").trim(); // Column B = index 1
-              const link = (row[6] || "#").trim();                 // Column G = index 6
+              const section = (row[3] || "Uncategorized").trim() || "Uncategorized"; // Column D = index 3
+              if (!grouped[section]) grouped[section] = [];
+              grouped[section].push({
+                number: (row[0] || "—").trim(),      // Column A
+                name:   (row[1] || "Unnamed Resolution").trim(), // Column B
+                link:   (row[6] || "#").trim()       // Column G
+              });
+            });
+
+            // Sort sections alphabetically
+            const sortedSections = Object.keys(grouped).sort();
+
+            let html = '';
+            let totalPassed = 0;
+
+            sortedSections.forEach(section => {
+              const items = grouped[section];
+              totalPassed += items.length;
 
               html += `
-                <a href="${link}" target="_blank" 
-                   class="resolution-card block bg-white border border-gray-200 rounded-3xl p-6 hover:border-blue-300 group">
-                  <div class="flex justify-between items-start">
-                    <h3 class="text-xl font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">${name}</h3>
-                    <span class="text-green-500 text-sm font-medium bg-green-100 px-3 py-1 rounded-2xl">PASSED</span>
-                  </div>
-                  <p class="mt-4 text-blue-600 text-sm flex items-center gap-1">
-                    View Resolution 
-                    <span class="text-lg leading-none">→</span>
-                  </p>
-                </a>`;
+                <div>
+                  <h2 class="text-3xl font-semibold text-gray-800 mb-6 flex items-center gap-3">
+                    <span>${section}</span>
+                    <span class="text-sm font-medium bg-blue-100 text-blue-700 px-4 py-1 rounded-3xl">${items.length} passed</span>
+                  </h2>
+                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              `;
+
+              items.forEach(item => {
+                html += `
+                  <a href="${item.link}" target="_blank" 
+                     class="resolution-card block bg-white border border-gray-200 rounded-3xl p-6 hover:border-blue-300 group">
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <span class="inline-block px-3 py-1 text-xs font-mono bg-blue-100 text-blue-700 rounded-2xl mb-2">${item.number}</span>
+                        <h3 class="text-xl font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">${item.name}</h3>
+                      </div>
+                      <span class="text-green-500 text-sm font-medium bg-green-100 px-3 py-1 rounded-2xl">PASSED</span>
+                    </div>
+                    <p class="mt-6 text-blue-600 text-sm flex items-center gap-1">
+                      View Full Resolution 
+                      <span class="text-lg leading-none">→</span>
+                    </p>
+                  </a>`;
+              });
+
+              html += `</div></div>`;
             });
 
             resultsDiv.innerHTML = html;
             statusDiv.innerHTML = `
-              <span class="font-medium text-green-600">${passed.length}</span> resolutions passed • 
+              <span class="font-medium text-green-600">${totalPassed}</span> total resolutions passed • 
               Last updated: ${new Date().toLocaleString()}
             `;
           }
         });
       } catch (err) {
         resultsDiv.innerHTML = `
-          <div class="col-span-full bg-red-50 border border-red-200 text-red-700 rounded-3xl p-8 text-center">
+          <div class="bg-red-50 border border-red-200 text-red-700 rounded-3xl p-8 text-center">
             Could not load sheet. Make sure the CSV link is correct and the sheet is published.<br>
             <small class="block mt-2 text-red-500">${err.message}</small>
           </div>`;
